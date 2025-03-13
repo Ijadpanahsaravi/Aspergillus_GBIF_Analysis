@@ -1,0 +1,96 @@
+---
+title: "Aspergillus Species Abundance Analysis"
+author: "Maryam Ijadpanahsaravi"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+  pdf_document: default
+---
+## Aspergillus_Analysis.Rmd
+```{r setup, include=FALSE}
+# Load required libraries
+library(dplyr)
+library(ggplot2)
+
+# Read dataset
+datanew2 <- read.delim("C:/Users/31645/OneDrive - Universiteit Utrecht/Documents/Apergillus_data.csv", header = TRUE, sep = ";")
+
+```
+
+## Dataset Overview
+```{r}
+# Check column names
+colnames(datanew2)
+
+# Count total Aspergillus records
+total_records <- nrow(datanew2)
+
+# Replace empty species names with "Aspergillus sp."
+datanew2$species[datanew2$species == "" & datanew2$scientificName == "Aspergillus P.Micheli, 1729"] <- "Aspergillus sp"
+datanew2$species[datanew2$species == ""] <- "Aspergillus sp"
+
+# Count unique species (excluding "Aspergillus sp")
+num_species <- length(unique(datanew2$species[datanew2$species != "Aspergillus sp"]))
+
+# Count genus-level records (excluded from plot)
+genus_level_records <- sum(datanew2$species == "Aspergillus sp")
+
+# Print summary
+total_records
+num_species
+genus_level_records
+
+```
+## Species Abundance Plot
+```{r}
+# Remove "Aspergillus sp." for species-level analysis
+filtered_data <- datanew2[datanew2$species != "Aspergillus sp", ]
+
+# Create a species abundance table
+species_abundance <- data.frame(table(filtered_data$species))
+
+# Remove empty species names (if any)
+species_abundance <- species_abundance[species_abundance$Var1 != "", ]
+
+# Filter species with at least 1000 occurrences
+filtered_species <- subset(species_abundance, Freq > 1000)
+
+# Ensure correct sorting
+filtered_species$Var1 <- factor(filtered_species$Var1, levels = filtered_species$Var1[order(-filtered_species$Freq)])
+
+# List of species to highlight
+highlight_species <- c("Aspergillus niger", "Aspergillus flavus", "Aspergillus fumigatus", 
+                       "Aspergillus nidulans", "Aspergillus terreus")
+
+# Create the plot
+ggplot(filtered_species, aes(x = Var1, y = Freq)) +
+  geom_bar(stat = "identity", fill = "navy") +
+  xlab("Species") +
+  ylab("Abundance") + 
+  ylim(c(0, 10000)) +  
+  theme(
+    panel.background = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.line = element_line(color = "black", size = 1),
+    axis.text.y = element_text(color = "black", size = 10),
+    axis.text.x = element_text(color = "black", size = 10, angle = 45, hjust = 1),
+    legend.position = "none"
+  ) +
+  geom_text(
+    aes(label = ifelse(Var1 %in% highlight_species, "*", "")),
+    vjust = 0, color = "black", fontface = "bold", size = 5
+  ) +
+  guides(fill = "none")
+
+```
+
+## Conclusion
+```{r}
+cat("This plot shows the abundance of *Aspergillus* species in the dataset obtained from [GBIF.org (11 March 2025)](https://doi.org/10.15468/dl.zgyxs9).\n\n")
+cat("The dataset includes a total of **", total_records, "** registered *Aspergillus* records, with **", num_species, "** distinct species identified.\n\n")
+cat("Additionally, **", genus_level_records, "** records were identified only at the **genus level** (*Aspergillus sp.*) and excluded from the plot to focus on identified species.\n\n")
+cat("The most abundant species include *Aspergillus niger*, *Aspergillus flavus*, and *Aspergillus fumigatus*, among others. The plot only includes species with **more than 1000 occurrences**.")
+
+```
+
