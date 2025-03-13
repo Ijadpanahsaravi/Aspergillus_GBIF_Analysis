@@ -5,7 +5,7 @@ This project analyzes the **abundance and distribution** of *Aspergillus* specie
 The dataset includes a total of **92,116** registered *Aspergillus* records, with **517** distinct species identified.  
 Additionally, **13693** records were identified only at the **genus level** (*Aspergillus sp.*) and excluded from the plot to focus on identified species.  
 
-The most abundant species include *Aspergillus niger*, *Aspergillus flavus*, and *Aspergillus fumigatus*, among others. The plot only includes species with **more than 1000 occurrences**.
+The most abundant species include *Aspergillus niger*, *Aspergillus flavus*, and *Aspergillus fumigatus*, among others. 
 
 
 ## 📥 Dataset Source
