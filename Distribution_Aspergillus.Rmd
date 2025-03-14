@@ -1,0 +1,119 @@
+---
+title: "Global Distribution of Aspergillus"
+author: "Maryam Ijadpanahsaravi"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+### **📌 Introduction**
+This document visualizes the **global distribution of Aspergillus species** using GBIF data.  
+The dataset is processed, cleaned, and mapped to country-level data using **ISO3 country codes**.  
+
+---
+
+## ** Load Required Libraries**
+```{r}
+# Install missing packages if needed (uncomment the line below)
+# install.packages(c("rworldmap", "classInt", "RColorBrewer", "dplyr", "countrycode", "data.table"))
+
+# Load required libraries
+library(data.table)       # For reading large CSV files
+library(rworldmap)        # World map data
+library(classInt)         # Classification of numeric data
+library(RColorBrewer)     # Color palettes
+library(dplyr)            # Data manipulation
+library(countrycode)      # Country code conversion
+```
+## ** Load & Clean GBIF Data**
+```{r}
+# Load the dataset
+gbif_data <- fread("Apergillus_data.csv", stringsAsFactors = FALSE, data.table = FALSE)
+
+# Clean latitude & longitude data
+gbif_data_cleaned <- gbif_data %>%
+  mutate(
+    decimalLatitude = as.numeric(str_replace_all(decimalLatitude, "[^0-9\\.-]", "")),  
+    decimalLongitude = as.numeric(str_replace_all(decimalLongitude, "[^0-9\\.-]", ""))  
+  ) %>%
+  filter(
+    !is.na(decimalLatitude) & !is.na(decimalLongitude),
+    decimalLatitude >= -90 & decimalLatitude <= 90,
+    decimalLongitude >= -180 & decimalLongitude <= 180
+  )
+
+# Convert to a standard data frame if needed
+gbif_data_cleaned <- as.data.frame(gbif_data_cleaned)
+
+```
+
+## **Convert ISO2 Country Codes to ISO3**
+```{r}
+# Convert countryCode (ISO2) to ISO3
+gbif_data_cleaned <- gbif_data_cleaned %>%
+  mutate(iso3 = countrycode(countryCode, "iso2c", "iso3c")) %>%
+  filter(!is.na(iso3))  # Remove rows where conversion failed
+```
+## **Aggregate Species Occurrences Per Country**
+```{r}
+# Count unique species per country
+species_count <- gbif_data_cleaned %>%
+  group_by(iso3) %>%
+  summarise(total_species = n_distinct(species))
+
+# Merge species count with cleaned GBIF data
+merged_data <- left_join(gbif_data_cleaned, species_count, by = "iso3")
+head(merged_data)
+
+```
+## **Match GBIF Data to World Map**
+```{r}
+# Load world map data
+world_map <- getMap(resolution = "coarse")
+
+# Join GBIF data with world map
+sPDF <- joinCountryData2Map(merged_data, joinCode = "ISO3", nameJoinColumn = "iso3")
+
+```
+```{r}
+# Convert NA values in total_species to 0 for mapping
+sPDF$total_species[is.na(sPDF$total_species)] <- 0
+
+```
+## **Define Color Palette & Classification**
+```{r}
+# Define color palette (RdPu)
+colourPalette <- brewer.pal(5, 'RdPu')
+
+# Define class intervals using the Jenks method
+classInt <- classIntervals(sPDF$total_species, n = 5, style = "jenks")
+catMethod <- classInt$brks
+
+```
+## **Generate the Global Aspergillus Hotspot Map**
+```{r}
+# Generate the map
+mapParams <- mapCountryData(sPDF, 
+                            nameColumnToPlot = "total_species", 
+                            addLegend = FALSE, 
+                            catMethod = catMethod, 
+                            colourPalette = colourPalette)
+
+# Add a legend
+do.call(addMapLegend, c(mapParams, 
+                        legendLabels = "all", 
+                        legendWidth = 0.5, 
+                        legendIntervals = "data"))
+
+```
+##**Check for Unmatched Countries**
+```{r}
+# Identify GBIF country codes that did not match rworldmap
+setdiff(merged_data$iso3, world_map@data$ISO_A3)
+
+```
+##**Session Info for Reproducibility**
+```{r}
+sessionInfo()
+
+```
+
