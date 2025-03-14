@@ -1,0 +1,150 @@
+---
+title: "Global Distribution of Aspergillus by Climate Zone"
+author: "Maryam Ijadpanahsaravi"
+date: "`r Sys.Date()`"
+output: html_notebook
+---
+
+## **📌 Introduction**
+This notebook analyzes the **global distribution of Aspergillus species across different climate zones** using **GBIF occurrence data**.
+
+---
+
+## **1️⃣ Load Required Libraries**
+```{r}
+# Install missing packages (if necessary)
+# install.packages(c("tidyverse", "data.table", "ggplot2", "leaflet", "dplyr"))
+
+# Load required libraries
+library(tidyverse)  # For data manipulation and visualization
+library(data.table) # Efficient data loading for large files
+library(ggplot2)    # For plotting
+library(leaflet)    # For interactive maps
+library(dplyr)      # For data manipulation
+library(stringr)    # For text processing
+```
+2️⃣ Load & Explore the Dataset
+```{r}
+# Load dataset
+gbif_data <- fread("Apergillus_data.csv", stringsAsFactors = FALSE, data.table = FALSE)
+
+# Get basic info
+summary(gbif_data)  # Summary statistics
+str(gbif_data)      # Structure of the dataset
+glimpse(gbif_data)  # A quick overview
+dim(gbif_data)      # Number of rows and columns
+colnames(gbif_data) # Column names
+
+# Check for missing values
+colSums(is.na(gbif_data))
+
+# Check unique species count (if "species" column exists)
+if("species" %in% colnames(gbif_data)) {
+  length(unique(gbif_data$species))
+} else {
+  "No 'species' column found"
+}
+
+```
+3️⃣ Clean Latitude & Longitude Data
+```{r}
+# Convert latitude & longitude to numeric and remove non-numeric characters
+gbif_data_cleaned <- gbif_data %>%
+  mutate(
+    decimalLatitude = as.numeric(str_replace_all(decimalLatitude, "[^0-9\\.-]", "")),
+    decimalLongitude = as.numeric(str_replace_all(decimalLongitude, "[^0-9\\.-]", ""))
+  ) %>%
+  filter(
+    !is.na(decimalLatitude) & !is.na(decimalLongitude),
+    between(decimalLatitude, -90, 90),
+    between(decimalLongitude, -180, 180)
+  )
+
+# Convert to data.frame if necessary
+gbif_data_cleaned <- as.data.frame(gbif_data_cleaned)
+
+# Check for remaining missing values
+colSums(is.na(gbif_data_cleaned[c("decimalLatitude", "decimalLongitude")]))
+
+```
+4️⃣ Visualizing Geographic Distribution
+📍 Histogram of Latitude & Longitude
+```{r}
+# Latitude distribution
+ggplot(gbif_data_cleaned, aes(x = decimalLatitude)) +
+  geom_histogram(bins = 30, fill = "navy", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Distribution of Latitude", x = "Latitude", y = "Count")
+
+# Longitude distribution
+ggplot(gbif_data_cleaned, aes(x = decimalLongitude)) +
+  geom_histogram(bins = 30, fill = "red3", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Distribution of Longitude", x = "Longitude", y = "Count")
+
+```
+📍 Scatterplot of Aspergillus Occurrences
+```{r}
+ggplot(gbif_data_cleaned, aes(x = decimalLongitude, y = decimalLatitude)) +
+  geom_point(alpha = 0.5, color = "navy") +
+  theme_minimal() +
+  labs(title = "Geographic Distribution of Aspergillus", x = "Longitude", y = "Latitude")
+
+```
+5️⃣ Interactive Map of Aspergillus Occurrences
+```{r}
+leaflet(gbif_data_cleaned) %>%
+  addTiles() %>%
+  addCircleMarkers(
+    ~decimalLongitude, ~decimalLatitude,
+    radius = 2, color = "navy", stroke = FALSE, fillOpacity = 0.7
+  ) %>%
+  setView(lng = mean(gbif_data_cleaned$decimalLongitude, na.rm = TRUE),
+          lat = mean(gbif_data_cleaned$decimalLatitude, na.rm = TRUE),
+          zoom = 2)
+
+```
+6️⃣ Classifying Climate Zones
+```{r}
+# Define climate zones based on latitude
+gbif_data_cleaned <- gbif_data_cleaned %>%
+  mutate(
+    climate_zone = case_when(
+      between(decimalLatitude, -23.5, 23.5)  ~ "Tropical",
+      between(decimalLatitude, -35, -23.5) | between(decimalLatitude, 23.5, 35) ~ "Subtropical",
+      between(decimalLatitude, -60, -35) | between(decimalLatitude, 35, 60) ~ "Temperate",
+      decimalLatitude > 60 | decimalLatitude < -60  ~ "Polar",
+      TRUE ~ "Unknown"
+    )
+  )
+
+# Count records per climate zone
+table(gbif_data_cleaned$climate_zone)
+
+```
+7️⃣ Visualizing Aspergillus Abundance in Climate Zones
+```{r}
+# Count occurrences per climate zone
+climate_counts <- gbif_data_cleaned %>%
+  group_by(climate_zone) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count))
+
+# Bar plot
+ggplot(climate_counts, aes(x = reorder(climate_zone, -count), y = count, fill = climate_zone)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Frequency of Aspergillus Occurrences in Climate Zones",
+       x = "Climate Zone",
+       y = "Number of Occurrences") +
+  scale_fill_manual(values = c("Tropical" = "#FF9900", 
+                               "Subtropical" = "#FFCC00",
+                               "Temperate" = "#0099CC", 
+                               "Polar" = "#003366")) +
+  theme(legend.position = "none")
+
+```
+
+Tropical regions have the highest Aspergillus occurrences, likely due to warm, humid conditions favorable for fungal growth.
+Temperate zones also show significant occurrence levels.
+Subtropical & Polar regions have the least reported cases, possibly due to lower fungal survival rates or less sampling effort.
